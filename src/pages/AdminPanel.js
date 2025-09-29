@@ -1,1 +1,59 @@
-import React, {useState, useRef} from 'react';import Webcam from 'react-webcam';export default function AdminPanel(){const webcamRef=useRef(null);const [username,setUsername]=useState('');const labels=['front','left','right','up','down'];const [step,setStep]=useState(0);const [status,setStatus]=useState('');async function capture(){if(!username){alert('enter username');return;}const src=webcamRef.current.getScreenshot();const blob=await (await fetch(src)).blob();const fd=new FormData();fd.append('image',blob,'cap.jpg');fd.append('username',username);fd.append('label',labels[step]);try{const res=await fetch('http://127.0.0.1:5000/admin/add-student-webcam',{method:'POST',body:fd});const j=await res.json();setStatus(j.msg);setStep(s=>Math.min(s+1,labels.length-1));if(step>=labels.length-1){alert('captures done, model retrained');}}catch(e){setStatus('error')} }return (<div style={{border:'1px solid #ddd',padding:12}}><h3>Admin - Register Student</h3><input placeholder='student username' value={username} onChange={e=>setUsername(e.target.value)}/><div style={{marginTop:8}}><Webcam audio={false} ref={webcamRef} screenshotFormat='image/jpeg' width={320} height={240}/></div><p>Capture: {labels[step]}</p><div style={{marginTop:8}}><button onClick={capture}>Capture</button></div><p>{status}</p></div>)}
+import React, { useState, useRef } from "react";
+import Webcam from "react-webcam";
+export default function AdminPanel() {
+  const webcamRef = useRef(null);
+  const [username, setUsername] = useState("");
+  const labels = ["front", "left", "right", "up", "down"];
+  const [step, setStep] = useState(0);
+  const [status, setStatus] = useState("");
+  async function capture() {
+    if (!username) {
+      alert("enter username");
+      return;
+    }
+    const src = webcamRef.current.getScreenshot();
+    const blob = await (await fetch(src)).blob();
+    const fd = new FormData();
+    fd.append("image", blob, "cap.jpg");
+    fd.append("username", username);
+    fd.append("label", labels[step]);
+    try {
+      const res = await fetch(
+        "http://127.0.0.1:5000/admin/add-student-webcam",
+        { method: "POST", body: fd }
+      );
+      const j = await res.json();
+      setStatus(j.msg);
+      setStep((s) => Math.min(s + 1, labels.length - 1));
+      if (step >= labels.length - 1) {
+        alert("captures done, model retrained");
+      }
+    } catch (e) {
+      setStatus("error");
+    }
+  }
+  return (
+    <div style={{ border: "1px solid #ddd", padding: 12 }}>
+      <h3>Admin - Register Student</h3>
+      <input
+        placeholder="student username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+      <div style={{ marginTop: 8 }}>
+        <Webcam
+          audio={false}
+          ref={webcamRef}
+          screenshotFormat="image/jpeg"
+          width={320}
+          height={240}
+        />
+      </div>
+      <p>Capture: {labels[step]}</p>
+      <div style={{ marginTop: 8 }}>
+        <button onClick={capture}>Capture</button>
+      </div>
+      <p>{status}</p>
+    </div>
+  );
+}
