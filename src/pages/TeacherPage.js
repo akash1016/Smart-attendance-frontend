@@ -2,21 +2,25 @@ import React, { useState, useEffect } from "react";
 import TeacherPanel from "./TeacherPanel";
 import AdminPanel from "./AdminPanel";
 
+export default TeacherPage;
+
 function generateUsername(first, last) {
   return (
     (first.trim().toLowerCase() + (last ? last.trim().toLowerCase() : ""))
       .replace(/\s+/g, "") + "_" + Math.floor(Math.random() * 1000)
-  );
+    );
+  }
 
 function generatePassword() {
   return Math.random().toString(36).slice(-8);
 }
 
-function RegisterStudentForm({ onRegistered }) {
+function RegisterStudentForm({ onRegistered, onSwitchToFaceID }) {
   const [form, setForm] = useState({ first_name: "", last_name: "", email_id: "" });
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [result, setResult] = useState(null);
+  const [newUsername, setNewUsername] = useState("");
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -51,6 +55,7 @@ function RegisterStudentForm({ onRegistered }) {
         setStatus("Student added successfully!");
         setResult({ username: data.username, password: data.password });
         setForm({ first_name: "", last_name: "", email_id: "" });
+        setNewUsername(data.username);
         if (typeof onRegistered === "function") onRegistered({ username: data.username, password: data.password });
       } else {
         setStatus(data.msg || "Failed to add student.");
@@ -117,11 +122,30 @@ function RegisterStudentForm({ onRegistered }) {
         <div style={{ marginTop: 14, background: "#f0f4fa", padding: 10, borderRadius: 6 }}>
           <b>Username:</b> {result.username}<br />
           <b>Password:</b> {result.password}
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              style={{
+                padding: "8px 16px",
+                background: "#1976d2",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                fontWeight: 500,
+                marginTop: 8,
+                cursor: "pointer"
+              }}
+              onClick={() => onSwitchToFaceID && onSwitchToFaceID(newUsername)}
+            >
+              Proceed to Add FaceID
+            </button>
+          </div>
         </div>
       )}
     </form>
   );
 }
+
 function StudentListTab() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -229,10 +253,18 @@ function StudentListTab() {
   );
 }
 
+
+function TeacherPage() {
   const [activeTab, setActiveTab] = useState("attendance");
   const [faceUsername, setFaceUsername] = useState("");
   const [studentOptions, setStudentOptions] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+
+  // Handler to switch to FaceID tab and pre-select username
+  function handleSwitchToFaceID(username) {
+    setActiveTab("faceid");
+    setFaceUsername(username);
+  }
 
   // Fetch student list for FaceID tab
   useEffect(() => {
@@ -248,7 +280,8 @@ function StudentListTab() {
           const data = await res.json();
           if (res.ok && data.ok && Array.isArray(data.students)) {
             setStudentOptions(data.students);
-            if (data.students.length > 0) setFaceUsername(data.students[0].username);
+            // Only set faceUsername if not already set (e.g., after registration)
+            if (!faceUsername && data.students.length > 0) setFaceUsername(data.students[0].username);
           } else {
             setStudentOptions([]);
           }
@@ -321,7 +354,7 @@ function StudentListTab() {
       <div>
         {activeTab === "attendance" && <TeacherPanel />}
         {activeTab === "studentlist" && <StudentListTab />}
-        {activeTab === "register" && <RegisterStudentForm />}
+        {activeTab === "register" && <RegisterStudentForm onSwitchToFaceID={handleSwitchToFaceID} />}
         {activeTab === "faceid" && (
           <div style={{ maxWidth: 400, margin: "0 auto" }}>
             <h3 style={{ color: "#1976d2", marginBottom: 12 }}>Add FaceID for Student</h3>
@@ -352,3 +385,5 @@ function StudentListTab() {
     </div>
   );
 }
+
+
