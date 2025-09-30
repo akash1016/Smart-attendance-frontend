@@ -1,236 +1,66 @@
-function ManualAttendanceTab() {
-  const [students, setStudents] = React.useState([]);
-  const [selected, setSelected] = React.useState([]);
-  const [date, setDate] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [status, setStatus] = React.useState("");
-  const [results, setResults] = React.useState([]);
+import AdminPanel from "./AdminPanel";
+import React, { useState } from "react";
+
+// Complaint List Tab
+function ComplaintListTab() {
+  const [complaints, setComplaints] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState("");
 
   React.useEffect(() => {
-    async function fetchStudents() {
-      try {
-        const res = await fetch("http://127.0.0.1:5000/admin/get-student-list", {
-          headers: { Authorization: "demo-admin" }
-        });
-        const data = await res.json();
-        if (res.ok && data.ok && Array.isArray(data.students)) {
-          setStudents(data.students);
-        }
-      } catch {}
-    }
-    fetchStudents();
+    fetchComplaints();
+    // eslint-disable-next-line
   }, []);
 
-  function handleSelect(username) {
-    setSelected(sel =>
-      sel.includes(username)
-        ? sel.filter(u => u !== username)
-        : [...sel, username]
-    );
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function fetchComplaints() {
     setLoading(true);
-    setStatus("");
-    setResults([]);
-    if (!date || selected.length === 0) {
-      setStatus("Please select at least one student and a date.");
-      setLoading(false);
-      return;
-    }
+    setErr("");
     try {
-      const res = await fetch("http://127.0.0.1:5000/admin/mark-attendance-manual", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "demo-admin"
-        },
-        body: JSON.stringify({ usernames: selected, date })
+      const res = await fetch("http://127.0.0.1:5000/admin/complaint-list", {
+        headers: { Authorization: "demo-admin" }
       });
       const data = await res.json();
-      if (res.ok && data.ok) {
-        setStatus("Attendance marked successfully.");
-        setResults(data.results || []);
-        setSelected([]);
-        setDate("");
+      if (res.ok && data.ok && Array.isArray(data.complaints)) {
+        setComplaints(data.complaints);
       } else {
-        setStatus(data.msg || "Failed to mark attendance.");
+        setErr(data.msg || "Failed to fetch complaints.");
       }
     } catch (e) {
-      setStatus("Failed to mark attendance.");
+      setErr("Failed to fetch complaints.");
     }
     setLoading(false);
   }
 
   return (
-    <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <h3 style={{ marginBottom: 14, color: '#1976d2', letterSpacing: 0.5 }}>Manual Attendance</h3>
-      <form onSubmit={handleSubmit} style={{ background: '#f8fafc', padding: 18, borderRadius: 8, marginBottom: 18 }}>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontWeight: 500, marginRight: 8 }}>Date:</label>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            required
-            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
-          />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontWeight: 500, marginBottom: 6, display: 'block' }}>Select Students:</label>
-          <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 6, background: '#fff', padding: 8 }}>
-            {students.length === 0 ? (
-              <div style={{ color: '#888' }}>No students found.</div>
-            ) : (
-              students.map(s => (
-                <label key={s.username} style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(s.username)}
-                    onChange={() => handleSelect(s.username)}
-                    style={{ marginRight: 8 }}
-                  />
-                  {s.username} ({s.first_name} {s.last_name})
-                </label>
-              ))
-            )}
-          </div>
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "8px 16px",
-            background: loading ? "#90caf9" : "#1976d2",
-            color: loading ? "#eee" : "#fff",
-            border: "none",
-            borderRadius: 4,
-            fontWeight: 500,
-            letterSpacing: 0.2,
-            cursor: loading ? "not-allowed" : "pointer",
-            transition: 'background 0.2s, color 0.2s'
-          }}
-        >
-          {loading ? "Marking..." : "Mark Attendance"}
-        </button>
-        {status && <div style={{ color: status.includes("success") ? "green" : "#b00", marginTop: 10 }}>{status}</div>}
-      </form>
-      {results.length > 0 && (
-        <div style={{ background: '#f0f4fa', borderRadius: 8, padding: 12 }}>
-          <b>Results:</b>
-          <ul style={{ margin: '8px 0 0 0', padding: 0, listStyle: 'none' }}>
-            {results.map(r => (
-              <li key={r.username} style={{ color: r.msg.includes('Already') ? '#b00' : 'green', marginBottom: 4 }}>
-                {r.username}: {r.msg}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-function TeacherList() {
-  const [teachers, setTeachers] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [deletingId, setDeletingId] = React.useState(null);
-
-  React.useEffect(() => {
-    async function fetchTeachers() {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch("http://127.0.0.1:5000/admin/get-teacher-list", {
-          headers: {
-            Authorization: "demo-admin"
-          }
-        });
-        const data = await res.json();
-        if (res.ok && data.ok && Array.isArray(data.teachers)) {
-          setTeachers(data.teachers);
-        } else {
-          setError(data.msg || "Failed to fetch teacher list.");
-        }
-      } catch (e) {
-        setError("Failed to fetch teacher list.");
-      }
-      setLoading(false);
-    }
-    fetchTeachers();
-  }, []);
-
-  async function handleDeleteTeacher(username) {
-    if (!window.confirm("Are you sure you want to delete this teacher?")) return;
-    setDeletingId(username);
-    try {
-      // Backend API: /admin/delete-teacher/<username> (DELETE)
-      const res = await fetch(`http://127.0.0.1:5000/admin/delete-teacher/${username}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: "demo-admin"
-        }
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setTeachers(ts => ts.filter(t => t.username !== username));
-      } else {
-        alert(data.msg || "Failed to delete teacher.");
-      }
-    } catch (e) {
-      alert("Failed to delete teacher.");
-    }
-    setDeletingId(null);
-  }
-
-  return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-  <h3 style={{ marginBottom: 14, color: '#1565c0', letterSpacing: 0.5 }}>Teacher List</h3>
+    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      <h3 style={{ color: "#1976d2", marginBottom: 12 }}>Complaint List</h3>
       {loading ? (
-        <div>Loading teachers...</div>
-      ) : error ? (
-        <div style={{ color: "red" }}>{error}</div>
-      ) : teachers.length === 0 ? (
-        <div style={{ color: "#888" }}>No teachers found.</div>
+        <div>Loading complaints...</div>
+      ) : err ? (
+        <div style={{ color: "#e53935" }}>{err}</div>
+      ) : complaints.length === 0 ? (
+        <div style={{ color: "#888" }}>No complaints found.</div>
       ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", background: "#f7faff" }}>
           <thead>
-            <tr style={{ background: "#f0f4fa" }}>
-              <th style={{ padding: 8, border: "1px solid #ddd" }}>Username</th>
-              <th style={{ padding: 8, border: "1px solid #ddd" }}>First Name</th>
-              <th style={{ padding: 8, border: "1px solid #ddd" }}>Last Name</th>
-              <th style={{ padding: 8, border: "1px solid #ddd" }}>Email</th>
-              <th style={{ padding: 8, border: "1px solid #ddd" }}></th>
+            <tr style={{ background: "#e3f0ff" }}>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>ID</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Student Username</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Title</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Description</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Status</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Created At</th>
             </tr>
           </thead>
           <tbody>
-            {teachers.map(t => (
-              <tr key={t.profile_id}>
-                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.username}</td>
-                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.first_name}</td>
-                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.last_name}</td>
-                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.email_id}</td>
-                <td style={{ padding: 8, border: "1px solid #ddd" }}>
-                  <button
-                    onClick={() => handleDeleteTeacher(t.username)}
-                    disabled={deletingId === t.username}
-                    style={{
-                      background: deletingId === t.username ? "#ccc" : "#e53935",
-                      color: deletingId === t.username ? "#666" : "#fff",
-                      border: "none",
-                      borderRadius: 4,
-                      padding: "4px 10px",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      letterSpacing: 0.2,
-                      cursor: deletingId === t.username ? "not-allowed" : "pointer",
-                      transition: 'background 0.2s, color 0.2s'
-                    }}
-                  >
-                    {deletingId === t.username ? "Deleting..." : "Delete"}
-                  </button>
-                </td>
+            {complaints.map(c => (
+              <tr key={c.complaint_id}>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{c.complaint_id}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{c.student_username || '-'}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{c.title}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{c.description}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd", color: c.status === 'Open' ? '#e53935' : '#388e3c', fontWeight: 500 }}>{c.status}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{c.created_at ? new Date(c.created_at).toLocaleString() : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -239,6 +69,153 @@ function TeacherList() {
     </div>
   );
 }
+
+// Attendance Records Tab
+function AttendanceRecordsTab() {
+  const [students, setStudents] = React.useState([]);
+  const [selectedStudent, setSelectedStudent] = React.useState("");
+  const [startDate, setStartDate] = React.useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
+  });
+  const [endDate, setEndDate] = React.useState(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
+  const [records, setRecords] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  const [fetchingStudents, setFetchingStudents] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchStudents();
+    // eslint-disable-next-line
+  }, []);
+
+  async function fetchStudents() {
+    setFetchingStudents(true);
+    setErr("");
+    try {
+      const res = await fetch("http://127.0.0.1:5000/admin/get-student-list", {
+        headers: { Authorization: "demo-admin" }
+      });
+      const data = await res.json();
+      if (res.ok && data.ok && Array.isArray(data.students)) {
+        setStudents(data.students);
+        if (data.students.length > 0) setSelectedStudent(data.students[0].username);
+      } else {
+        setErr(data.msg || "Failed to fetch students.");
+      }
+    } catch (e) {
+      setErr("Failed to fetch students.");
+    }
+    setFetchingStudents(false);
+  }
+
+  async function handleFetchRecords(e) {
+    e.preventDefault();
+    setLoading(true);
+    setErr("");
+    setRecords([]);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/attendance/get-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: selectedStudent, start_date: startDate, end_date: endDate })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setRecords(data.records);
+      } else {
+        setErr(data.msg || "Failed to fetch records.");
+      }
+    } catch (e) {
+      setErr("Failed to fetch records.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 500, margin: "0 auto" }}>
+      <h3 style={{ color: "#1976d2", marginBottom: 12 }}>Attendance Records</h3>
+      {fetchingStudents ? (
+        <div>Loading students...</div>
+      ) : err ? (
+        <div style={{ color: "#e53935" }}>{err}</div>
+      ) : (
+        <form onSubmit={handleFetchRecords} style={{ background: "#f7faff", padding: 16, borderRadius: 8, marginBottom: 18 }}>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontWeight: 500, marginRight: 8 }}>Student:</label>
+            <select
+              value={selectedStudent}
+              onChange={e => setSelectedStudent(e.target.value)}
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 160 }}
+              required
+            >
+              {students.map(s => (
+                <option key={s.username} value={s.username}>{s.username} ({s.first_name} {s.last_name})</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontWeight: 500, marginRight: 8 }}>Start Date:</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              required
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+            />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontWeight: 500, marginRight: 8 }}>End Date:</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              required
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !selectedStudent}
+            style={{ background: loading ? "#90caf9" : "#1976d2", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontWeight: 500, cursor: loading ? "not-allowed" : "pointer" }}
+          >
+            {loading ? "Fetching..." : "Get Records"}
+          </button>
+        </form>
+      )}
+      {records && records.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", background: "#f7faff" }}>
+            <thead>
+              <tr style={{ background: "#e3f0ff" }}>
+                <th style={{ padding: 8, border: "1px solid #ddd" }}>Date</th>
+                <th style={{ padding: 8, border: "1px solid #ddd" }}>Status</th>
+                <th style={{ padding: 8, border: "1px solid #ddd" }}>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map(r => (
+                <tr key={r.attendance_id}>
+                  <td style={{ padding: 8, border: "1px solid #ddd" }}>{r.attendance_date}</td>
+                  <td style={{ padding: 8, border: "1px solid #ddd", color: r.status === 'Present' ? '#388e3c' : '#e53935' }}>{r.status}</td>
+                  <td style={{ padding: 8, border: "1px solid #ddd" }}>{r.remarks || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {records && records.length === 0 && !loading && !fetchingStudents && (
+        <div style={{ color: "#888", marginTop: 10 }}>No records found for selected interval.</div>
+      )}
+    </div>
+  );
+}
+
 function generateTeacherUsername(first, last) {
   return (
     (first.trim().toLowerCase() + (last ? last.trim().toLowerCase() : ""))
@@ -249,6 +226,7 @@ function generateTeacherUsername(first, last) {
 function generateTeacherPassword() {
   return Math.random().toString(36).slice(-8);
 }
+
 
 function AddTeacherForm() {
   const [form, setForm] = React.useState({ first_name: "", last_name: "", email_id: "" });
@@ -359,6 +337,7 @@ function AddTeacherForm() {
     </form>
   );
 }
+
 function StudentList() {
   const [students, setStudents] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -471,6 +450,8 @@ function StudentList() {
     </div>
   );
 }
+
+
 function AddAnnouncementForm() {
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -679,9 +660,249 @@ function AddAnnouncementForm() {
   );
 }
 
-import AdminPanel from "./AdminPanel";
+function TeacherList() {
+  const [teachers, setTeachers] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [deletingId, setDeletingId] = React.useState(null);
 
-import React, { useState } from "react";
+  React.useEffect(() => {
+    async function fetchTeachers() {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch("http://127.0.0.1:5000/admin/get-teacher-list", {
+          headers: {
+            Authorization: "demo-admin"
+          }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && Array.isArray(data.teachers)) {
+          setTeachers(data.teachers);
+        } else {
+          setError(data.msg || "Failed to fetch teacher list.");
+        }
+      } catch (e) {
+        setError("Failed to fetch teacher list.");
+      }
+      setLoading(false);
+    }
+    fetchTeachers();
+  }, []);
+
+  async function handleDeleteTeacher(username) {
+    if (!window.confirm("Are you sure you want to delete this teacher?")) return;
+    setDeletingId(username);
+    try {
+      // Backend API: /admin/delete-teacher/<username> (DELETE)
+      const res = await fetch(`http://127.0.0.1:5000/admin/delete-teacher/${username}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: "demo-admin"
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setTeachers(ts => ts.filter(t => t.username !== username));
+      } else {
+        alert(data.msg || "Failed to delete teacher.");
+      }
+    } catch (e) {
+      alert("Failed to delete teacher.");
+    }
+    setDeletingId(null);
+  }
+
+  return (
+    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+  <h3 style={{ marginBottom: 14, color: '#1565c0', letterSpacing: 0.5 }}>Teacher List</h3>
+      {loading ? (
+        <div>Loading teachers...</div>
+      ) : error ? (
+        <div style={{ color: "red" }}>{error}</div>
+      ) : teachers.length === 0 ? (
+        <div style={{ color: "#888" }}>No teachers found.</div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+          <thead>
+            <tr style={{ background: "#f0f4fa" }}>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Username</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>First Name</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Last Name</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}>Email</th>
+              <th style={{ padding: 8, border: "1px solid #ddd" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {teachers.map(t => (
+              <tr key={t.profile_id}>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.username}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.first_name}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.last_name}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>{t.email_id}</td>
+                <td style={{ padding: 8, border: "1px solid #ddd" }}>
+                  <button
+                    onClick={() => handleDeleteTeacher(t.username)}
+                    disabled={deletingId === t.username}
+                    style={{
+                      background: deletingId === t.username ? "#ccc" : "#e53935",
+                      color: deletingId === t.username ? "#666" : "#fff",
+                      border: "none",
+                      borderRadius: 4,
+                      padding: "4px 10px",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      letterSpacing: 0.2,
+                      cursor: deletingId === t.username ? "not-allowed" : "pointer",
+                      transition: 'background 0.2s, color 0.2s'
+                    }}
+                  >
+                    {deletingId === t.username ? "Deleting..." : "Delete"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function ManualAttendanceTab() {
+  const [students, setStudents] = React.useState([]);
+  const [selected, setSelected] = React.useState([]);
+  const [date, setDate] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState("");
+  const [results, setResults] = React.useState([]);
+
+  React.useEffect(() => {
+    async function fetchStudents() {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/admin/get-student-list", {
+          headers: { Authorization: "demo-admin" }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && Array.isArray(data.students)) {
+          setStudents(data.students);
+        }
+      } catch {}
+    }
+    fetchStudents();
+  }, []);
+
+  function handleSelect(username) {
+    setSelected(sel =>
+      sel.includes(username)
+        ? sel.filter(u => u !== username)
+        : [...sel, username]
+    );
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setStatus("");
+    setResults([]);
+    if (!date || selected.length === 0) {
+      setStatus("Please select at least one student and a date.");
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch("http://127.0.0.1:5000/admin/mark-attendance-manual", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "demo-admin"
+        },
+        body: JSON.stringify({ usernames: selected, date })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setStatus("Attendance marked successfully.");
+        setResults(data.results || []);
+        setSelected([]);
+        setDate("");
+      } else {
+        setStatus(data.msg || "Failed to mark attendance.");
+      }
+    } catch (e) {
+      setStatus("Failed to mark attendance.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 500, margin: "0 auto" }}>
+      <h3 style={{ marginBottom: 14, color: '#1976d2', letterSpacing: 0.5 }}>Manual Attendance</h3>
+      <form onSubmit={handleSubmit} style={{ background: '#f8fafc', padding: 18, borderRadius: 8, marginBottom: 18 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Date:</label>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginBottom: 6, display: 'block' }}>Select Students:</label>
+          <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 6, background: '#fff', padding: 8 }}>
+            {students.length === 0 ? (
+              <div style={{ color: '#888' }}>No students found.</div>
+            ) : (
+              students.map(s => (
+                <label key={s.username} style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(s.username)}
+                    onChange={() => handleSelect(s.username)}
+                    style={{ marginRight: 8 }}
+                  />
+                  {s.username} ({s.first_name} {s.last_name})
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "8px 16px",
+            background: loading ? "#90caf9" : "#1976d2",
+            color: loading ? "#eee" : "#fff",
+            border: "none",
+            borderRadius: 4,
+            fontWeight: 500,
+            letterSpacing: 0.2,
+            cursor: loading ? "not-allowed" : "pointer",
+            transition: 'background 0.2s, color 0.2s'
+          }}
+        >
+          {loading ? "Marking..." : "Mark Attendance"}
+        </button>
+        {status && <div style={{ color: status.includes("success") ? "green" : "#b00", marginTop: 10 }}>{status}</div>}
+      </form>
+      {results.length > 0 && (
+        <div style={{ background: '#f0f4fa', borderRadius: 8, padding: 12 }}>
+          <b>Results:</b>
+          <ul style={{ margin: '8px 0 0 0', padding: 0, listStyle: 'none' }}>
+            {results.map(r => (
+              <li key={r.username} style={{ color: r.msg.includes('Already') ? '#b00' : 'green', marginBottom: 4 }}>
+                {r.username}: {r.msg}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Real backend URL for student registration
 const REGISTER_URL = "http://127.0.0.1:5000/admin/add-student";
 
@@ -928,6 +1149,32 @@ export default function AdminPage() {
         >
           Manual Attendance
         </button>
+        <button
+          onClick={() => setActiveTab("attendancerecords")}
+          style={{
+            background: activeTab === "attendancerecords" ? "#1976d2" : "#eee",
+            color: activeTab === "attendancerecords" ? "#fff" : "#222",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer"
+          }}
+        >
+          Attendance Records
+        </button>
+        <button
+          onClick={() => setActiveTab("complaintlist")}
+          style={{
+            background: activeTab === "complaintlist" ? "#1976d2" : "#eee",
+            color: activeTab === "complaintlist" ? "#fff" : "#222",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer"
+          }}
+        >
+          Complaint List
+        </button>
       </div>
   <div>
         {activeTab === "register" && (
@@ -983,7 +1230,7 @@ export default function AdminPage() {
           ) : (
             <div style={{ color: "#b00", textAlign: "center", marginTop: 32 }}>
               Please register a student first.<br />
-              <button onClick={() => setActiveTab("register")} style={{ marginTop: 12, padding: "6px 16px" }}>Go to Register</button>
+              <button onClick={() => setActiveTab("register") } style={{ marginTop: 12, padding: "6px 16px" }}>Go to Register</button>
             </div>
           )
         )}
@@ -995,6 +1242,12 @@ export default function AdminPage() {
         )}
         {activeTab === "manualattendance" && (
           <ManualAttendanceTab />
+        )}
+        {activeTab === "attendancerecords" && (
+          <AttendanceRecordsTab />
+        )}
+        {activeTab === "complaintlist" && (
+          <ComplaintListTab />
         )}
       </div>
     </div>
