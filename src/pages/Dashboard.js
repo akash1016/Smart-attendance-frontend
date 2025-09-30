@@ -1,7 +1,7 @@
 import React from "react";
 import AdminPanel from "./AdminPanel";
 import TeacherPanel from "./TeacherPanel";
-import StudentPanel from "./StudentPanel";
+import StudentPage from "./StudentPage";
 import AdminPage from "./AdminPage";
 import TeacherPage from "./TeacherPage";
 
@@ -67,7 +67,7 @@ export default function Dashboard() {
         <div style={{ marginBottom: 24 }}>
           {role === "Admin" && <AdminPage />}
           {role === "Teacher" && <TeacherPage />}
-          {role === "Student" && <StudentPanel />}
+          {role === "Student" && <StudentPage />}
         </div>
         <hr
           style={{
