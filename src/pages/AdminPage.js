@@ -1,6 +1,151 @@
+function AttendanceRecordTab() {
+  const [username, setUsername] = React.useState("");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState("");
+  const [records, setRecords] = React.useState([]);
+  const [studentList, setStudentList] = React.useState([]);
+
+  React.useEffect(() => {
+    async function fetchStudents() {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/admin/get-student-list", {
+          headers: { Authorization: "demo-admin" }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && Array.isArray(data.students)) {
+          setStudentList(data.students.map(s => s.username));
+        }
+      } catch {}
+    }
+    fetchStudents();
+  }, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setStatus("");
+    setRecords([]);
+    if (!username || !startDate || !endDate) {
+      setStatus("Please enter username and both dates.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/attendance/get-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, start_date: startDate, end_date: endDate })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setRecords(data.records || []);
+        setStatus("");
+      } else {
+        setStatus(data.msg || "Failed to fetch records.");
+      }
+    } catch {
+      setStatus("Failed to fetch records.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 500, margin: "0 auto" }}>
+      <h3 style={{ marginBottom: 14, color: '#1976d2', letterSpacing: 0.5 }}>Attendance Records</h3>
+      <form onSubmit={handleSubmit} style={{ background: '#f8fafc', padding: 18, borderRadius: 8, marginBottom: 18 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Student Username:</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 120 }}
+            >
+              <option value="">--Select--</option>
+              {studentList.map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Or type username"
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 120 }}
+            />
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Start Date:</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>End Date:</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "8px 16px",
+            background: loading ? "#90caf9" : "#1976d2",
+            color: loading ? "#eee" : "#fff",
+            border: "none",
+            borderRadius: 4,
+            fontWeight: 500,
+            letterSpacing: 0.2,
+            cursor: loading ? "not-allowed" : "pointer",
+            transition: 'background 0.2s, color 0.2s'
+          }}
+        >
+          {loading ? "Fetching..." : "Get Records"}
+        </button>
+        {status && <div style={{ color: status.includes("success") ? "green" : "#b00", marginTop: 10 }}>{status}</div>}
+      </form>
+      {records.length > 0 && (
+        <div style={{ background: '#f0f4fa', borderRadius: 8, padding: 12 }}>
+          <b>Records:</b>
+          <table style={{ width: "100%", marginTop: 8, background: '#fff', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#e3eafc' }}>
+                <th style={{ padding: 6, border: '1px solid #bbb' }}>Date</th>
+                <th style={{ padding: 6, border: '1px solid #bbb' }}>Status</th>
+                <th style={{ padding: 6, border: '1px solid #bbb' }}>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map(r => (
+                <tr key={r.attendance_id}>
+                  <td style={{ padding: 6, border: '1px solid #bbb' }}>{r.attendance_date}</td>
+                  <td style={{ padding: 6, border: '1px solid #bbb' }}>{r.status}</td>
+                  <td style={{ padding: 6, border: '1px solid #bbb' }}>{r.remarks || ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ManualAttendanceTab() {
   const [students, setStudents] = React.useState([]);
   const [selected, setSelected] = React.useState([]);
+  const [manualUsernames, setManualUsernames] = React.useState("");
   const [date, setDate] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [status, setStatus] = React.useState("");
@@ -29,13 +174,28 @@ function ManualAttendanceTab() {
     );
   }
 
+  function handleManualUsernamesChange(e) {
+    setManualUsernames(e.target.value);
+    // If user types, clear all checkboxes
+    setSelected([]);
+  }
+
+  
+
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setStatus("");
     setResults([]);
-    if (!date || selected.length === 0) {
-      setStatus("Please select at least one student and a date.");
+    // Use manual usernames if provided, else use selected checkboxes
+    let usernames = [];
+    if (manualUsernames.trim()) {
+      usernames = manualUsernames.split(",").map(u => u.trim()).filter(Boolean);
+    } else {
+      usernames = selected;
+    }
+    if (!date || usernames.length === 0) {
+      setStatus("Please select at least one student or enter usernames, and a date.");
       setLoading(false);
       return;
     }
@@ -46,13 +206,14 @@ function ManualAttendanceTab() {
           "Content-Type": "application/json",
           Authorization: "demo-admin"
         },
-        body: JSON.stringify({ usernames: selected, date })
+        body: JSON.stringify({ usernames, date })
       });
       const data = await res.json();
       if (res.ok && data.ok) {
         setStatus("Attendance marked successfully.");
         setResults(data.results || []);
         setSelected([]);
+        setManualUsernames("");
         setDate("");
       } else {
         setStatus(data.msg || "Failed to mark attendance.");
@@ -78,18 +239,29 @@ function ManualAttendanceTab() {
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ fontWeight: 500, marginBottom: 6, display: 'block' }}>Select Students:</label>
+          <label style={{ fontWeight: 500, marginBottom: 6, display: 'block' }}>Select Students or Enter Usernames:</label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input
+              type="text"
+              value={manualUsernames}
+              onChange={handleManualUsernamesChange}
+              placeholder="Type usernames, comma separated"
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 180 }}
+            />
+            <span style={{ color: '#888', fontSize: 13, alignSelf: 'center' }}>(or use checkboxes below)</span>
+          </div>
           <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 6, background: '#fff', padding: 8 }}>
             {students.length === 0 ? (
               <div style={{ color: '#888' }}>No students found.</div>
             ) : (
               students.map(s => (
-                <label key={s.username} style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
+                <label key={s.username} style={{ display: 'block', marginBottom: 4, cursor: 'pointer', opacity: manualUsernames ? 0.5 : 1 }}>
                   <input
                     type="checkbox"
                     checked={selected.includes(s.username)}
                     onChange={() => handleSelect(s.username)}
                     style={{ marginRight: 8 }}
+                    disabled={!!manualUsernames}
                   />
                   {s.username} ({s.first_name} {s.last_name})
                 </label>
@@ -131,6 +303,145 @@ function ManualAttendanceTab() {
     </div>
   );
 }
+
+function DeleteAttendanceTab() {
+  const [usernames, setUsernames] = React.useState([]);
+  const [username, setUsername] = React.useState("");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState("");
+
+  React.useEffect(() => {
+    async function fetchUsernames() {
+      try {
+        const adminUsername = "admin";
+        const token = `demo-${adminUsername}`;
+        const res = await fetch("http://127.0.0.1:5000/admin/get-all-student-usernames", {
+          headers: {
+            Authorization: token,
+            username: adminUsername
+          }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && Array.isArray(data.usernames)) {
+          setUsernames(data.usernames);
+        } else {
+          setStatus(data.msg || "Failed to fetch usernames.");
+        }
+      } catch {
+        setStatus("Failed to fetch usernames.");
+      }
+    }
+    fetchUsernames();
+  }, []);
+
+  async function handleDelete(e) {
+    e.preventDefault();
+    setStatus("");
+    if (!username || !startDate || !endDate) {
+      setStatus("Please enter a student username and both dates.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const adminUsername = "admin";
+      const token = `demo-${adminUsername}`;
+      const res = await fetch("http://127.0.0.1:5000/admin/delete-attendance-records", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token
+        },
+        body: JSON.stringify({
+          username: username,
+          start_date: startDate,
+          end_date: endDate
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setStatus(data.msg || "Attendance records deleted successfully.");
+        setStartDate("");
+        setEndDate("");
+      } else {
+        setStatus(data.msg || "Failed to delete attendance records.");
+      }
+    } catch {
+      setStatus("Failed to delete attendance records.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 420, margin: "0 auto" }}>
+      <h3 style={{ marginBottom: 14, color: '#1976d2', letterSpacing: 0.5 }}>Delete Attendance Records</h3>
+      <form onSubmit={handleDelete} style={{ background: '#f8fafc', padding: 18, borderRadius: 8, marginBottom: 18 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Student Username:</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 120 }}
+            >
+              <option value="">--Select--</option>
+              {usernames.map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Or type username"
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 120 }}
+            />
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Start Date:</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>End Date:</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "8px 16px",
+            background: loading ? "#90caf9" : "#e53935",
+            color: loading ? "#eee" : "#fff",
+            border: "none",
+            borderRadius: 4,
+            fontWeight: 500,
+            letterSpacing: 0.2,
+            cursor: loading ? "not-allowed" : "pointer",
+            transition: 'background 0.2s, color 0.2s'
+          }}
+        >
+          {loading ? "Deleting..." : "Delete Records"}
+        </button>
+        {status && <div style={{ color: status.includes("Deleted") || status.includes("success") ? "green" : "#b00", marginTop: 10 }}>{status}</div>}
+      </form>
+    </div>
+  );
+}
+
 function TeacherList() {
   const [teachers, setTeachers] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -838,6 +1149,32 @@ const REGISTER_URL = "http://127.0.0.1:5000/admin/add-student";
       <h2 style={{ color: '#0d47a1', letterSpacing: 0.5, marginBottom: 10 }}>Admin Page</h2>
   <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button
+          onClick={() => setActiveTab("attendancerecord")}
+          style={{
+            background: activeTab === "attendancerecord" ? "#1976d2" : "#eee",
+            color: activeTab === "attendancerecord" ? "#fff" : "#222",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer"
+          }}
+        >
+          Attendance Record
+        </button>
+        <button
+          onClick={() => setActiveTab("deleteattendance")}
+          style={{
+            background: activeTab === "deleteattendance" ? "#1976d2" : "#eee",
+            color: activeTab === "deleteattendance" ? "#fff" : "#222",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer"
+          }}
+        >
+          Delete Attendance
+        </button>
+        <button
           onClick={() => { setActiveTab("register"); }}
           style={{
             background: activeTab === "register" ? "#1976d2" : "#eee",
@@ -995,6 +1332,12 @@ const REGISTER_URL = "http://127.0.0.1:5000/admin/add-student";
         )}
         {activeTab === "manualattendance" && (
           <ManualAttendanceTab />
+        )}
+        {activeTab === "deleteattendance" && (
+          <DeleteAttendanceTab />
+        )}
+        {activeTab === "attendancerecord" && (
+          <AttendanceRecordTab />
         )}
       </div>
     </div>

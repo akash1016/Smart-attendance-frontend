@@ -1,18 +1,159 @@
-// Attendance Records Tab
-
-// Manual Attendance Tab
-
 
 import React, { useState, useEffect } from "react";
 import TeacherPanel from "./TeacherPanel";
 import AdminPanel from "./AdminPanel";
 
 export default TeacherPage;
-// Announcement Tab Components
 
+// Delete Attendance Tab (Teacher)
+function DeleteAttendanceTab() {
+  const [usernames, setUsernames] = React.useState([]);
+  const [username, setUsername] = React.useState("");
+  const [manualUsername, setManualUsername] = React.useState("");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState("");
+
+  React.useEffect(() => {
+    async function fetchUsernames() {
+      try {
+        const teacherUsername = localStorage.getItem("username");
+        const token = `demo-${teacherUsername}`;
+        const res = await fetch("http://127.0.0.1:5000/admin/get-all-student-usernames", {
+          headers: {
+            Authorization: token,
+            username: teacherUsername
+          }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && Array.isArray(data.usernames)) {
+          setUsernames(data.usernames);
+        } else {
+          setStatus(data.msg || "Failed to fetch usernames.");
+        }
+      } catch {
+        setStatus("Failed to fetch usernames.");
+      }
+    }
+    fetchUsernames();
+  }, []);
+
+  async function handleDelete(e) {
+    e.preventDefault();
+    setStatus("");
+    const uname = manualUsername.trim() ? manualUsername.trim() : username;
+    if (!uname || !startDate || !endDate) {
+      setStatus("Please enter a student username and both dates.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const teacherUsername = localStorage.getItem("username");
+      const token = `demo-${teacherUsername}`;
+      const res = await fetch("http://127.0.0.1:5000/admin/delete-attendance-records", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token
+        },
+        body: JSON.stringify({
+          username: uname,
+          start_date: startDate,
+          end_date: endDate
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setStatus(data.msg || "Attendance records deleted successfully.");
+        setStartDate("");
+        setEndDate("");
+        setManualUsername("");
+        setUsername("");
+      } else {
+        setStatus(data.msg || "Failed to delete attendance records.");
+      }
+    } catch {
+      setStatus("Failed to delete attendance records.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 420, margin: "0 auto" }}>
+      <h3 style={{ marginBottom: 14, color: '#1976d2', letterSpacing: 0.5 }}>Delete Attendance Records</h3>
+      <form onSubmit={handleDelete} style={{ background: '#f8fafc', padding: 18, borderRadius: 8, marginBottom: 18 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Student Username:</label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <select
+              value={manualUsername ? "" : username}
+              onChange={e => setUsername(e.target.value)}
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 120 }}
+              disabled={!!manualUsername}
+            >
+              <option value="">--Select--</option>
+              {usernames.map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={manualUsername}
+              onChange={e => { setManualUsername(e.target.value); setUsername(""); }}
+              placeholder="Or type username"
+              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 120 }}
+            />
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>Start Date:</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontWeight: 500, marginRight: 8 }}>End Date:</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            required
+            style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "8px 16px",
+            background: loading ? "#90caf9" : "#e53935",
+            color: loading ? "#eee" : "#fff",
+            border: "none",
+            borderRadius: 4,
+            fontWeight: 500,
+            letterSpacing: 0.2,
+            cursor: loading ? "not-allowed" : "pointer",
+            transition: 'background 0.2s, color 0.2s'
+          }}
+        >
+          {loading ? "Deleting..." : "Delete Records"}
+        </button>
+        {status && <div style={{ color: status.includes("Deleted") || status.includes("success") ? "green" : "#b00", marginTop: 10 }}>{status}</div>}
+      </form>
+    </div>
+  );
+}
+
+// Manual Attendance Tab
 function ManualAttendanceTab() {
   const [usernames, setUsernames] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [manualUsernames, setManualUsernames] = useState("");
   const [date, setDate] = useState(() => {
     const d = new Date();
     return d.toISOString().slice(0, 10);
@@ -53,12 +194,23 @@ function ManualAttendanceTab() {
     setSelected(opts);
   }
 
+  function handleManualUsernamesChange(e) {
+    setManualUsernames(e.target.value);
+    if (e.target.value) setSelected([]);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     setResult(null);
     const username = localStorage.getItem("username");
     const token = `demo-${username}`;
+    let usernamesToSend = [];
+    if (manualUsernames.trim()) {
+      usernamesToSend = manualUsernames.split(",").map(u => u.trim()).filter(Boolean);
+    } else {
+      usernamesToSend = selected;
+    }
     try {
       const res = await fetch("http://127.0.0.1:5000/admin/mark-attendance-manual", {
         method: "POST",
@@ -66,7 +218,7 @@ function ManualAttendanceTab() {
           "Content-Type": "application/json",
           Authorization: token
         },
-        body: JSON.stringify({ usernames: selected, date })
+        body: JSON.stringify({ usernames: usernamesToSend, date })
       });
       const data = await res.json();
       if (res.ok && data.ok) {
@@ -100,23 +252,34 @@ function ManualAttendanceTab() {
             />
           </div>
           <div style={{ marginBottom: 10 }}>
-            <label style={{ fontWeight: 500, marginRight: 8 }}>Select Students:</label>
-            <select
-              multiple
-              value={selected}
-              onChange={handleSelectChange}
-              style={{ width: "100%", minHeight: 90, padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
-              required
-            >
-              {usernames.map(u => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>(Hold Ctrl/Cmd to select multiple)</div>
+            <label style={{ fontWeight: 500, marginRight: 8 }}>Student Usernames:</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <select
+                multiple
+                value={manualUsernames ? [] : selected}
+                onChange={handleSelectChange}
+                style={{ width: "100%", minHeight: 90, padding: 6, borderRadius: 4, border: '1px solid #bbb' }}
+                disabled={!!manualUsernames}
+              >
+                {usernames.map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={manualUsernames}
+                onChange={handleManualUsernamesChange}
+                placeholder="Or type usernames, comma separated"
+                style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 160 }}
+              />
+            </div>
+            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+              (Hold Ctrl/Cmd to select multiple from dropdown, or type usernames above)
+            </div>
           </div>
           <button
             type="submit"
-            disabled={submitting || selected.length === 0}
+            disabled={submitting || (!manualUsernames && selected.length === 0)}
             style={{ background: submitting ? "#90caf9" : "#1976d2", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontWeight: 500, cursor: submitting ? "not-allowed" : "pointer" }}
           >
             {submitting ? "Marking..." : "Mark Present"}
@@ -139,9 +302,11 @@ function ManualAttendanceTab() {
   );
 }
 
+// Attendance Records Tab
 function AttendanceRecordsTab() {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState("");
+  const [manualUsernames, setManualUsernames] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
@@ -152,6 +317,7 @@ function AttendanceRecordsTab() {
     return d.toISOString().slice(0, 10);
   });
   const [records, setRecords] = useState([]);
+  const [multiRecords, setMultiRecords] = useState([]); // For multiple students
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [fetchingStudents, setFetchingStudents] = useState(true);
@@ -188,17 +354,39 @@ function AttendanceRecordsTab() {
     setLoading(true);
     setErr("");
     setRecords([]);
+    setMultiRecords([]);
+    // If manualUsernames is provided, split and fetch for each
+    let usernamesToFetch = [];
+    if (manualUsernames.trim()) {
+      usernamesToFetch = manualUsernames.split(",").map(u => u.trim()).filter(Boolean);
+    } else if (selectedStudent) {
+      usernamesToFetch = [selectedStudent];
+    }
+    if (usernamesToFetch.length === 0) {
+      setErr("Please select or enter at least one student username.");
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await fetch("http://127.0.0.1:5000/attendance/get-records", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: selectedStudent, start_date: startDate, end_date: endDate })
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setRecords(data.records);
+      // Fetch records for each username
+      const allResults = [];
+      for (const uname of usernamesToFetch) {
+        const res = await fetch("http://127.0.0.1:5000/attendance/get-records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: uname, start_date: startDate, end_date: endDate })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          allResults.push({ username: uname, records: data.records });
+        } else {
+          allResults.push({ username: uname, error: data.msg || "Failed to fetch records." });
+        }
+      }
+      if (allResults.length === 1 && !allResults[0].error) {
+        setRecords(allResults[0].records);
       } else {
-        setErr(data.msg || "Failed to fetch records.");
+        setMultiRecords(allResults);
       }
     } catch (e) {
       setErr("Failed to fetch records.");
@@ -217,16 +405,30 @@ function AttendanceRecordsTab() {
         <form onSubmit={handleFetchRecords} style={{ background: "#f7faff", padding: 16, borderRadius: 8, marginBottom: 18 }}>
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontWeight: 500, marginRight: 8 }}>Student:</label>
-            <select
-              value={selectedStudent}
-              onChange={e => setSelectedStudent(e.target.value)}
-              style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 160 }}
-              required
-            >
-              {students.map(u => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <select
+                value={manualUsernames ? "" : selectedStudent}
+                onChange={e => setSelectedStudent(e.target.value)}
+                style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 160 }}
+                disabled={!!manualUsernames}
+                required={!manualUsernames}
+              >
+                <option value="">--Select--</option>
+                {students.map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={manualUsernames}
+                onChange={e => { setManualUsernames(e.target.value); if (e.target.value) setSelectedStudent(""); }}
+                placeholder="Or type usernames, comma separated"
+                style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 180 }}
+              />
+            </div>
+            <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+              (Select a student from dropdown, or enter one or more usernames above, comma separated)
+            </div>
           </div>
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontWeight: 500, marginRight: 8 }}>Start Date:</label>
@@ -250,13 +452,14 @@ function AttendanceRecordsTab() {
           </div>
           <button
             type="submit"
-            disabled={loading || !selectedStudent}
+            disabled={loading || (!manualUsernames && !selectedStudent)}
             style={{ background: loading ? "#90caf9" : "#1976d2", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontWeight: 500, cursor: loading ? "not-allowed" : "pointer" }}
           >
             {loading ? "Fetching..." : "Get Records"}
           </button>
         </form>
       )}
+      {/* Single student records */}
       {records && records.length > 0 && (
         <div style={{ marginTop: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", background: "#f7faff" }}>
@@ -279,13 +482,49 @@ function AttendanceRecordsTab() {
           </table>
         </div>
       )}
-      {records && records.length === 0 && !loading && !fetchingStudents && (
+      {/* Multiple students records */}
+      {multiRecords && multiRecords.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {multiRecords.map((entry, idx) => (
+            <div key={entry.username || idx} style={{ marginBottom: 18, background: '#f7faff', borderRadius: 6, padding: 10, border: '1px solid #e3f0ff' }}>
+              <div style={{ fontWeight: 500, color: '#1976d2', marginBottom: 4 }}>Student: {entry.username}</div>
+              {entry.error ? (
+                <div style={{ color: '#e53935' }}>{entry.error}</div>
+              ) : entry.records && entry.records.length > 0 ? (
+                <table style={{ width: "100%", borderCollapse: "collapse", background: "#f7faff" }}>
+                  <thead>
+                    <tr style={{ background: "#e3f0ff" }}>
+                      <th style={{ padding: 8, border: "1px solid #ddd" }}>Date</th>
+                      <th style={{ padding: 8, border: "1px solid #ddd" }}>Status</th>
+                      <th style={{ padding: 8, border: "1px solid #ddd" }}>Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entry.records.map(r => (
+                      <tr key={r.attendance_id}>
+                        <td style={{ padding: 8, border: "1px solid #ddd" }}>{r.attendance_date}</td>
+                        <td style={{ padding: 8, border: "1px solid #ddd", color: r.status === 'Present' ? '#388e3c' : '#e53935' }}>{r.status}</td>
+                        <td style={{ padding: 8, border: "1px solid #ddd" }}>{r.remarks || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ color: '#888' }}>No records found for selected interval.</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* No records found for single student */}
+      {records && records.length === 0 && !loading && !fetchingStudents && !multiRecords.length && (
         <div style={{ color: "#888", marginTop: 10 }}>No records found for selected interval.</div>
       )}
     </div>
   );
 }
 
+// Announcement Tab Components
 function AnnouncementTab() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -772,6 +1011,19 @@ function TeacherPage() {
       <h2 style={{ color: '#0d47a1', letterSpacing: 0.5, marginBottom: 10 }}>Teacher Page</h2>
   <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button
+          onClick={() => setActiveTab("deleteattendance")}
+          style={{
+            background: activeTab === "deleteattendance" ? "#1976d2" : "#eee",
+            color: activeTab === "deleteattendance" ? "#fff" : "#222",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer"
+          }}
+        >
+          Delete Attendance
+        </button>
+        <button
           onClick={() => setActiveTab("manualattendance")}
           style={{
             background: activeTab === "manualattendance" ? "#1976d2" : "#eee",
@@ -867,6 +1119,7 @@ function TeacherPage() {
         {activeTab === "attendance" && <TeacherPanel />}
         {activeTab === "manualattendance" && <ManualAttendanceTab />}
         {activeTab === "attendancerecords" && <AttendanceRecordsTab />}
+        {activeTab === "deleteattendance" && <DeleteAttendanceTab />}
         {activeTab === "studentlist" && <StudentListTab />}
         {activeTab === "register" && <RegisterStudentForm onSwitchToFaceID={handleSwitchToFaceID} />}
         {activeTab === "faceid" && (
