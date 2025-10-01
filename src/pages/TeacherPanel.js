@@ -7,6 +7,8 @@ export default function TeacherPanel() {
   const [status, setStatus] = useState("");
   const [usernames, setUsernames] = useState([]);
   const [selectedUsername, setSelectedUsername] = useState("");
+  const [manualUsernames, setManualUsernames] = useState("");
+  const [multiResult, setMultiResult] = useState([]);
   const [webcamActive, setWebcamActive] = useState(false);
 
   // Fetch all student usernames for dropdown
@@ -37,13 +39,19 @@ export default function TeacherPanel() {
     let id;
     if (running) {
       setWebcamActive(true);
-      id = setInterval(capture, 3000);
+      id = setInterval(() => {
+        if (manualUsernames.trim()) {
+          captureMultiple();
+        } else {
+          capture();
+        }
+      }, 3000);
     } else {
       setWebcamActive(false);
     }
     return () => clearInterval(id);
     // eslint-disable-next-line
-  }, [running, selectedUsername]);
+  }, [running, selectedUsername, manualUsernames]);
 
   async function capture() {
     if (!selectedUsername) {
@@ -63,15 +71,12 @@ export default function TeacherPanel() {
         body: fd,
       });
       const j = await res.json();
-      // Handle new API response structure
       if (j.ok) {
         setStatus(j.msg + (j.conf !== undefined ? ` (conf=${j.conf?.toFixed ? j.conf.toFixed(2) : j.conf})` : ""));
         setRunning(false);
         setWebcamActive(false);
       } else {
-        // If face does not match, show predicted username if present in msg
         setStatus(j.msg + (j.conf !== undefined ? ` (conf=${j.conf?.toFixed ? j.conf.toFixed(2) : j.conf})` : ""));
-        // If attendance already marked, stop webcam
         if (j.msg && j.msg.toLowerCase().includes("already marked")) {
           setRunning(false);
           setWebcamActive(false);
@@ -82,16 +87,58 @@ export default function TeacherPanel() {
     }
   }
 
+  // New: Mark attendance for multiple usernames
+  async function captureMultiple() {
+    if (!manualUsernames.trim()) {
+      setStatus("Please enter at least one username.");
+      return;
+    }
+    if (!webcamRef.current) return;
+    const src = webcamRef.current.getScreenshot();
+    if (!src) return;
+    const blob = await (await fetch(src)).blob();
+    const names = manualUsernames.split(",").map(u => u.trim()).filter(Boolean);
+    if (names.length === 0) {
+      setStatus("Please enter at least one username.");
+      return;
+    }
+    setMultiResult([]);
+    let results = [];
+    for (const uname of names) {
+      const fd = new FormData();
+      fd.append("frame", blob, "frame.jpg");
+      fd.append("username", uname);
+      try {
+        const res = await fetch("http://127.0.0.1:5000/attendance/mark", {
+          method: "POST",
+          body: fd,
+        });
+        const j = await res.json();
+        results.push({ username: uname, msg: j.msg, ok: j.ok, conf: j.conf });
+        if (j.ok) {
+          setRunning(false);
+          setWebcamActive(false);
+        }
+      } catch (e) {
+        results.push({ username: uname, msg: "error", ok: false });
+      }
+    }
+    setMultiResult(results);
+    setStatus("");
+  }
+
   function handleStart() {
     setRunning(true);
     setWebcamActive(true);
     setStatus("Webcam started. Please position the student and wait for capture...");
+    setMultiResult([]);
   }
 
   function handleStop() {
     setRunning(false);
     setWebcamActive(false);
     setStatus("Webcam stopped.");
+    setMultiResult([]);
   }
 
   return (
@@ -113,7 +160,7 @@ export default function TeacherPanel() {
         <label style={{ fontWeight: 500, color: "#333" }}>
           Select Student:&nbsp;
           <select
-            value={selectedUsername}
+            value={manualUsernames ? "" : selectedUsername}
             onChange={e => setSelectedUsername(e.target.value)}
             style={{
               padding: "6px 14px",
@@ -123,6 +170,7 @@ export default function TeacherPanel() {
               color: "#1976d2",
               fontWeight: 500
             }}
+            disabled={!!manualUsernames}
           >
             {usernames.map(u => (
               <option key={u} value={u}>
@@ -131,6 +179,18 @@ export default function TeacherPanel() {
             ))}
           </select>
         </label>
+      </div>
+      <div style={{ marginBottom: 10, textAlign: "center" }}>
+        <input
+          type="text"
+          value={manualUsernames}
+          onChange={e => { setManualUsernames(e.target.value); if (e.target.value) setSelectedUsername(""); }}
+          placeholder="Or type usernames, comma separated"
+          style={{ padding: 6, borderRadius: 4, border: '1px solid #bbb', minWidth: 220 }}
+        />
+        <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+          (Select a student from dropdown, or enter one or more usernames above, comma separated)
+        </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
         {webcamActive ? (
@@ -201,6 +261,19 @@ export default function TeacherPanel() {
           Stop
         </button>
       </div>
+      {/* Show multiResult if present */}
+      {multiResult && multiResult.length > 0 && (
+        <div style={{ marginTop: 10, marginBottom: 8 }}>
+          <div style={{ fontWeight: 500, color: '#1976d2', marginBottom: 4 }}>Results:</div>
+          <ul style={{ paddingLeft: 18 }}>
+            {multiResult.map((r, i) => (
+              <li key={i} style={{ color: r.ok ? '#388e3c' : '#e53935' }}>
+                <b>{r.username}:</b> {r.msg} {r.conf !== undefined ? <span style={{ color: '#1976d2' }}> (conf={r.conf?.toFixed ? r.conf.toFixed(2) : r.conf})</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div
         style={{
           minHeight: 28,
